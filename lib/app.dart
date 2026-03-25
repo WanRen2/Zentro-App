@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'screens/profile_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart';
 import 'managers/profile_manager.dart';
 
 class ZentroApp extends StatefulWidget {
@@ -44,7 +44,7 @@ class _ZentroAppState extends State<ZentroApp> {
               ),
             )
           : _hasProfile
-          ? const HomeScreen()
+          ? const MainScreen()
           : const ProfileScreen(),
     );
   }

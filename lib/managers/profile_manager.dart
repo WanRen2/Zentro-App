@@ -78,4 +78,13 @@ class ProfileManager {
     _profile = profile;
     return profile;
   }
+
+  Future<void> clearProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_profileKey);
+    await prefs.remove('zentro_privkey');
+    await prefs.remove('zentro_pubkey');
+    _profile = null;
+    _keyPair = null;
+  }
 }
