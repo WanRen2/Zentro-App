@@ -5,10 +5,23 @@ import '../config.dart';
 class BackendClient {
   final String baseUrl;
   final http.Client _client;
+  String? _authToken;
 
   BackendClient({String? baseUrl, http.Client? client})
     : baseUrl = baseUrl ?? AppConfig.backendUrl,
       _client = client ?? http.Client();
+
+  void setAuthToken(String token) {
+    _authToken = token;
+  }
+
+  Map<String, String> get _headers {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (_authToken != null) {
+      headers['Authorization'] = 'Bearer $_authToken';
+    }
+    return headers;
+  }
 
   Future<void> uploadMessage(
     String chatId,
@@ -23,7 +36,7 @@ class BackendClient {
     };
     final resp = await _client.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode(body),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -33,7 +46,7 @@ class BackendClient {
 
   Future<List<String>> listMessages(String chatId) async {
     final url = '$baseUrl/message/list?chat_id=$chatId';
-    final resp = await _client.get(Uri.parse(url));
+    final resp = await _client.get(Uri.parse(url), headers: _headers);
     if (resp.statusCode != 200) {
       throw Exception('listMessages failed: ${resp.statusCode}');
     }
@@ -47,7 +60,7 @@ class BackendClient {
     String messageId,
   ) async {
     final url = '$baseUrl/message/get?chat_id=$chatId&message_id=$messageId';
-    final resp = await _client.get(Uri.parse(url));
+    final resp = await _client.get(Uri.parse(url), headers: _headers);
     if (resp.statusCode != 200) {
       throw Exception('getMessage failed: ${resp.statusCode}');
     }
@@ -67,7 +80,7 @@ class BackendClient {
     };
     final resp = await _client.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode(body),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -78,11 +91,21 @@ class BackendClient {
   Future<String> getChatKey(String chatId, String fingerprint) async {
     final url =
         '$baseUrl/chat/key/get?chat_id=$chatId&fingerprint=$fingerprint';
-    final resp = await _client.get(Uri.parse(url));
+    final resp = await _client.get(Uri.parse(url), headers: _headers);
     if (resp.statusCode != 200) {
       throw Exception('getChatKey failed: ${resp.statusCode}');
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     return data['encrypted_key'] as String;
+  }
+
+  Future<List<String>> listChatParticipants(String chatId) async {
+    final url = '$baseUrl/chat/keys/list?chat_id=$chatId';
+    final resp = await _client.get(Uri.parse(url), headers: _headers);
+    if (resp.statusCode != 200) {
+      throw Exception('listChatParticipants failed: ${resp.statusCode}');
+    }
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    return (data['participants'] as List).cast<String>();
   }
 }
