@@ -70,12 +70,36 @@ class _ChatScreenState extends State<ChatScreen> {
       final newMessages = <Map<String, dynamic>>[];
 
       for (final id in ids) {
-        // Check if message already loaded
         final exists = _messages.any((m) => m['id'] == id);
         if (!exists) {
           try {
             final m = await _backend.getMessage(widget.chatId, id);
-            newMessages.add({'id': id, ...m});
+            String? decryptedText;
+
+            if (m.containsKey('ciphertext') &&
+                m.containsKey('nonce') &&
+                m.containsKey('mac')) {
+              try {
+                final dec = await ChatCrypto.decryptWithChatKey(
+                  widget.chatKey,
+                  m['nonce'] as String,
+                  m['ciphertext'] as String,
+                  m['mac'] as String,
+                );
+                decryptedText = utf8.decode(dec);
+              } catch (e) {
+                // Only show "[Encrypted]" for messages from others
+                final isFromMe = m['from'] == _myFingerprint;
+                decryptedText = isFromMe ? null : '[Encrypted]';
+              }
+            }
+
+            newMessages.add({
+              'id': id,
+              ...m,
+              'text': decryptedText,
+              'decryptFailed': decryptedText == null,
+            });
           } catch (e) {
             // Message might not exist yet
           }
@@ -118,14 +142,11 @@ class _ChatScreenState extends State<ChatScreen> {
         'from': _myFingerprint,
         'nonce': enc['nonce'],
         'ciphertext': enc['ciphertext'],
+        'mac': enc['mac'],
         'ts': ts,
       };
       final messageId = const Uuid().v4();
       await _backend.uploadMessage(widget.chatId, messageId, payload);
-
-      setState(() {
-        _messages.add({'id': messageId, ...payload, 'text': text});
-      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -231,6 +252,13 @@ class _ChatScreenState extends State<ChatScreen> {
       itemBuilder: (context, index) {
         final msg = _messages[index];
         final isMe = msg['from'] == _myFingerprint;
+        final decryptFailed = msg['decryptFailed'] == true;
+
+        // Hide messages from self that failed to decrypt (something is wrong)
+        if (isMe && decryptFailed) {
+          return const SizedBox.shrink();
+        }
+
         final text = msg['text'] as String? ?? '[Encrypted]';
 
         return Align(
