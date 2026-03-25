@@ -121,4 +121,39 @@ class BackendClient {
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     return data['chat_key'] as String?;
   }
+
+  Future<String> uploadMedia(
+    String chatId,
+    String messageId,
+    String type,
+    String data,
+  ) async {
+    final url = '$baseUrl/message/media/upload';
+    final body = {
+      'chat_id': chatId,
+      'message_id': messageId,
+      'type': type,
+      'data': data,
+    };
+    final resp = await _client.post(
+      Uri.parse(url),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception('uploadMedia failed: ${resp.statusCode} ${resp.body}');
+    }
+    final response = jsonDecode(resp.body) as Map<String, dynamic>;
+    return response['path'] as String;
+  }
+
+  Future<String> getMedia(String path) async {
+    final url = '$baseUrl/message/media/get?path=${Uri.encodeComponent(path)}';
+    final resp = await _client.get(Uri.parse(url), headers: _headers);
+    if (resp.statusCode != 200) {
+      throw Exception('getMedia failed: ${resp.statusCode}');
+    }
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    return data['data'] as String;
+  }
 }
