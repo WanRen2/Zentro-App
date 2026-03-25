@@ -51,9 +51,13 @@ class _InviteScreenState extends State<InviteScreen> {
   }
 
   void _shareInvite() {
-    Share.share(
-      'Join my encrypted chat "${widget.chat.name}" on Zentro!\n\nInvite code:\n$_inviteData',
-      subject: 'Zentro Chat Invite',
+    Clipboard.setData(ClipboardData(text: _inviteData));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Invite code copied! Share it with others.'),
+        backgroundColor: Color(0xFF00FF9C),
+        duration: Duration(seconds: 3),
+      ),
     );
   }
 
