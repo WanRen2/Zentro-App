@@ -141,6 +141,36 @@ class _ChatScreenState extends State<ChatScreen> {
                 'text': m['sticker'] as String?,
                 'decryptFailed': false,
               });
+            } else if (msgType == 'album') {
+              final mediaIds = m['media_ids'] as List<dynamic>? ?? [];
+              final count = m['count'] as int? ?? mediaIds.length;
+              final images = <Map<String, dynamic>>[];
+
+              for (int i = 0; i < count && i < mediaIds.length; i++) {
+                try {
+                  final mediaId = mediaIds[i] as String;
+                  final imageData = await _backend.getMedia(
+                    'media/${widget.chatId}/${mediaIds[i]}.jpg',
+                  );
+                  images.add({'media_id': mediaId, 'data': imageData});
+                } catch (e) {
+                  try {
+                    final mediaId = mediaIds[i] as String;
+                    final imageData = await _backend.getMedia(
+                      'media/${widget.chatId}/$mediaId',
+                    );
+                    images.add({'media_id': mediaId, 'data': imageData});
+                  } catch (_) {}
+                }
+              }
+
+              newMessages.add({
+                'id': id,
+                ...m,
+                'images': images,
+                'text': null,
+                'decryptFailed': false,
+              });
             } else {
               String? decryptedText;
               bool decryptFailed = false;
@@ -417,59 +447,75 @@ class _ChatScreenState extends State<ChatScreen> {
     final imagesToSend = List<Map<String, dynamic>>.from(_pendingImages);
     setState(() => _pendingImages.clear());
 
-    for (final imageData in imagesToSend) {
-      try {
+    final messageId = const Uuid().v4();
+    final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    setState(() {
+      _messages.add({
+        'id': messageId,
+        'type': 'album',
+        'from': _myFingerprint,
+        'from_name': _myName,
+        'images': imagesToSend,
+        'ts': ts,
+        'pending': true,
+        'reactions': <String>[],
+      });
+      _pendingMessageIds.add(messageId);
+    });
+    _scrollToBottom();
+
+    try {
+      final mediaIds = <String>[];
+      final uploadFutures = <Future<void>>[];
+
+      for (int i = 0; i < imagesToSend.length; i++) {
+        final imageData = imagesToSend[i];
         final bytes = imageData['bytes'] as Uint8List;
         final base64Image = base64Encode(bytes);
-        final messageId = const Uuid().v4();
+        final mediaId = '${messageId}_$i';
 
-        setState(() {
-          _messages.add({
-            'id': messageId,
-            'type': 'image',
-            'from': _myFingerprint,
-            'from_name': _myName,
-            'image_data': base64Image,
-            'ts': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-            'pending': true,
-            'reactions': <String>[],
-          });
-          _pendingMessageIds.add(messageId);
-        });
-        _scrollToBottom();
-
-        await _backend.uploadMedia(
-          widget.chatId,
-          messageId,
-          'image',
-          base64Image,
-        );
-
-        final payload = {
-          'v': 1,
-          'type': 'image',
-          'from': _myFingerprint,
-          'from_name': _myName,
-          'media_id': messageId,
-          'ts': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          'reactions': <String>[],
-        };
-        await _backend.uploadMessage(widget.chatId, messageId, payload);
-
-        setState(() {
-          _pendingMessageIds.remove(messageId);
-          final idx = _messages.indexWhere((m) => m['id'] == messageId);
-          if (idx >= 0) _messages[idx]['pending'] = false;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send image: $e'),
-            backgroundColor: const Color(0xFFFF4444),
-          ),
+        uploadFutures.add(
+          _backend
+              .uploadMedia(widget.chatId, mediaId, 'image', base64Image)
+              .then((_) => mediaIds.add(mediaId)),
         );
       }
+
+      await Future.wait(uploadFutures);
+
+      final payload = {
+        'v': 1,
+        'type': 'album',
+        'from': _myFingerprint,
+        'from_name': _myName,
+        'media_ids': mediaIds,
+        'count': imagesToSend.length,
+        'ts': ts,
+        'reactions': <String>[],
+      };
+      await _backend.uploadMessage(widget.chatId, messageId, payload);
+
+      setState(() {
+        _pendingMessageIds.remove(messageId);
+        final idx = _messages.indexWhere((m) => m['id'] == messageId);
+        if (idx >= 0) {
+          _messages[idx]['pending'] = false;
+          _messages[idx]['media_ids'] = mediaIds;
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _messages.removeWhere((m) => m['id'] == messageId);
+        _pendingMessageIds.remove(messageId);
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send images: $e'),
+          backgroundColor: const Color(0xFFFF4444),
+        ),
+      );
     }
   }
 
@@ -825,6 +871,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
         if (msgType == 'sticker') {
           return _buildStickerMessage(msg, isMe);
+        } else if (msgType == 'album') {
+          return _buildAlbumMessage(msg, isMe);
         } else if (msgType == 'image') {
           return _buildImageMessage(msg, isMe);
         }
@@ -1235,6 +1283,358 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumMessage(Map<String, dynamic> msg, bool isMe) {
+    final name = msg['from_name'] as String? ?? 'User';
+    final pending = msg['pending'] == true;
+    final reactions = List<String>.from(msg['reactions'] ?? []);
+    final images = msg['images'] as List<dynamic>? ?? [];
+    final mediaIds = msg['media_ids'] as List<dynamic>? ?? [];
+    final count = msg['count'] as int? ?? images.length;
+
+    return GestureDetector(
+      onLongPress: () => _showMessageOptions(msg['id'], msg['from']),
+      child: Column(
+        crossAxisAlignment: isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isMe) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: const Color(0xFF00FF9C),
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                    style: const TextStyle(
+                      color: Color(0xFF0A0A0A),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.7,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isMe
+                        ? const Color(0xFF00FF9C)
+                        : const Color(0xFF2A2A2A),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: _buildAlbumGrid(images, mediaIds, count, pending),
+                ),
+              ),
+              if (isMe) const SizedBox(width: 40),
+            ],
+          ),
+          if (reactions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                mainAxisAlignment: isMe
+                    ? MainAxisAlignment.end
+                    : MainAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A2A2A),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: reactions
+                          .map(
+                            (r) =>
+                                Text(r, style: const TextStyle(fontSize: 14)),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumGrid(
+    List<dynamic> images,
+    List<dynamic> mediaIds,
+    int count,
+    bool pending,
+  ) {
+    if (images.isEmpty && mediaIds.isEmpty) {
+      return Container(
+        width: 200,
+        height: 200,
+        color: const Color(0xFF2A2A2A),
+        child: const Center(
+          child: Icon(Icons.image, color: Color(0xFF888888), size: 48),
+        ),
+      );
+    }
+
+    final imageCount = count > 0
+        ? count
+        : (images.isNotEmpty ? images.length : mediaIds.length);
+
+    if (imageCount == 1) {
+      return _buildAlbumImage(
+        images.isNotEmpty ? images[0] : null,
+        mediaIds.isNotEmpty ? mediaIds[0] : null,
+        280,
+        pending,
+      );
+    } else if (imageCount == 2) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildAlbumImage(
+                  images.isNotEmpty ? images[0] : null,
+                  mediaIds.isNotEmpty ? mediaIds[0] : null,
+                  140,
+                  pending,
+                ),
+              ),
+              Expanded(
+                child: _buildAlbumImage(
+                  images.length > 1 ? images[1] : null,
+                  mediaIds.length > 1 ? mediaIds[1] : null,
+                  140,
+                  pending,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    } else if (imageCount == 3) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildAlbumImage(
+                  images.isNotEmpty ? images[0] : null,
+                  mediaIds.isNotEmpty ? mediaIds[0] : null,
+                  140,
+                  pending,
+                ),
+              ),
+              Expanded(
+                child: _buildAlbumImage(
+                  images.length > 1 ? images[1] : null,
+                  mediaIds.length > 1 ? mediaIds[1] : null,
+                  140,
+                  pending,
+                ),
+              ),
+            ],
+          ),
+          _buildAlbumImage(
+            images.length > 2 ? images[2] : null,
+            mediaIds.length > 2 ? mediaIds[2] : null,
+            140,
+            pending,
+            fullWidth: true,
+          ),
+        ],
+      );
+    } else if (imageCount == 4) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildAlbumImage(
+                  images.isNotEmpty ? images[0] : null,
+                  mediaIds.isNotEmpty ? mediaIds[0] : null,
+                  140,
+                  pending,
+                ),
+              ),
+              Expanded(
+                child: _buildAlbumImage(
+                  images.length > 1 ? images[1] : null,
+                  mediaIds.length > 1 ? mediaIds[1] : null,
+                  140,
+                  pending,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAlbumImage(
+                  images.length > 2 ? images[2] : null,
+                  mediaIds.length > 2 ? mediaIds[2] : null,
+                  140,
+                  pending,
+                ),
+              ),
+              Expanded(
+                child: _buildAlbumImage(
+                  images.length > 3 ? images[3] : null,
+                  mediaIds.length > 3 ? mediaIds[3] : null,
+                  140,
+                  pending,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildAlbumImage(
+                  images.isNotEmpty ? images[0] : null,
+                  mediaIds.isNotEmpty ? mediaIds[0] : null,
+                  140,
+                  pending,
+                ),
+              ),
+              Expanded(
+                child: _buildAlbumImage(
+                  images.length > 1 ? images[1] : null,
+                  mediaIds.length > 1 ? mediaIds[1] : null,
+                  140,
+                  pending,
+                ),
+              ),
+            ],
+          ),
+          Stack(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildAlbumImage(
+                      images.length > 2 ? images[2] : null,
+                      mediaIds.length > 2 ? mediaIds[2] : null,
+                      140,
+                      pending,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildAlbumImage(
+                      images.length > 3 ? images[3] : null,
+                      mediaIds.length > 3 ? mediaIds[3] : null,
+                      140,
+                      pending,
+                    ),
+                  ),
+                ],
+              ),
+              if (imageCount > 4)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black54,
+                    child: Center(
+                      child: Text(
+                        '+${imageCount - 4}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildAlbumImage(
+    dynamic imageData,
+    dynamic mediaId,
+    double size,
+    bool pending, {
+    bool fullWidth = false,
+  }) {
+    Uint8List? imageBytes;
+
+    if (imageData != null && imageData is Map<String, dynamic>) {
+      imageBytes = imageData['bytes'] as Uint8List?;
+    }
+
+    return SizedBox(
+      width: fullWidth ? double.infinity : size,
+      height: size,
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          if (imageBytes != null)
+            Image.memory(
+              imageBytes,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: size,
+            )
+          else if (mediaId != null)
+            Container(
+              color: const Color(0xFF2A2A2A),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF00FF9C)),
+              ),
+            )
+          else
+            Container(
+              color: const Color(0xFF2A2A2A),
+              child: const Center(
+                child: Icon(Icons.image, color: Color(0xFF888888)),
+              ),
+            ),
+          if (pending)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black38,
+                child: const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF00FF9C),
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
