@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lottie/lottie.dart';
 import '../api/backend_client.dart';
 import '../managers/profile_manager.dart';
 import '../crypto/chat_crypto.dart';
@@ -100,34 +101,68 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!exists) {
           try {
             final m = await _backend.getMessage(widget.chatId, id);
-            String? decryptedText;
-            bool decryptFailed = false;
+            final msgType = m['type'] as String? ?? 'text';
 
-            if (m.containsKey('ciphertext') &&
-                m.containsKey('nonce') &&
-                m.containsKey('mac') &&
-                (m['mac'] as String?)?.isNotEmpty == true) {
-              try {
-                final dec = await ChatCrypto.decryptWithChatKey(
-                  widget.chatKey,
-                  m['nonce'] as String,
-                  m['ciphertext'] as String,
-                  m['mac'] as String,
-                );
-                decryptedText = utf8.decode(dec);
-              } catch (e) {
+            if (msgType == 'image') {
+              final mediaId = m['media_id'] as String?;
+              String? imageData;
+              if (mediaId != null) {
+                try {
+                  imageData = await _backend.getMedia(
+                    'media/${widget.chatId}/$mediaId.jpg',
+                  );
+                } catch (e) {
+                  try {
+                    imageData = await _backend.getMedia(
+                      'media/${widget.chatId}/$mediaId',
+                    );
+                  } catch (_) {}
+                }
+              }
+              newMessages.add({
+                'id': id,
+                ...m,
+                'image_data': imageData,
+                'text': null,
+                'decryptFailed': false,
+              });
+            } else if (msgType == 'sticker') {
+              newMessages.add({
+                'id': id,
+                ...m,
+                'text': m['sticker'] as String?,
+                'decryptFailed': false,
+              });
+            } else {
+              String? decryptedText;
+              bool decryptFailed = false;
+
+              if (m.containsKey('ciphertext') &&
+                  m.containsKey('nonce') &&
+                  m.containsKey('mac') &&
+                  (m['mac'] as String?)?.isNotEmpty == true) {
+                try {
+                  final dec = await ChatCrypto.decryptWithChatKey(
+                    widget.chatKey,
+                    m['nonce'] as String,
+                    m['ciphertext'] as String,
+                    m['mac'] as String,
+                  );
+                  decryptedText = utf8.decode(dec);
+                } catch (e) {
+                  decryptFailed = true;
+                }
+              } else {
                 decryptFailed = true;
               }
-            } else {
-              decryptFailed = true;
-            }
 
-            newMessages.add({
-              'id': id,
-              ...m,
-              'text': decryptFailed ? '[Encrypted]' : decryptedText,
-              'decryptFailed': decryptFailed,
-            });
+              newMessages.add({
+                'id': id,
+                ...m,
+                'text': decryptFailed ? '[Encrypted]' : decryptedText,
+                'decryptFailed': decryptFailed,
+              });
+            }
           } catch (e) {}
         }
       }
@@ -244,21 +279,27 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _sendSticker(String stickerEmoji) async {
+  Future<void> _sendSticker(StickerData sticker) async {
     try {
       final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       final payload = {
         'v': 1,
         'type': 'sticker',
         'from': _myFingerprint,
-        'sticker': stickerEmoji,
+        'sticker': sticker.emoji,
+        'sticker_id': sticker.id,
         'ts': ts,
       };
       final messageId = const Uuid().v4();
       await _backend.uploadMessage(widget.chatId, messageId, payload);
 
       setState(() {
-        _messages.add({'id': messageId, ...payload, 'text': stickerEmoji});
+        _messages.add({
+          'id': messageId,
+          ...payload,
+          'text': sticker.emoji,
+          'sticker_id': sticker.id,
+        });
       });
     } catch (e) {
       if (!mounted) return;
@@ -506,24 +547,48 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildStickerMessage(Map<String, dynamic> msg, bool isMe) {
+    final stickerId =
+        msg['sticker_id'] as String? ??
+        msg['sticker'] as String? ??
+        msg['text'] as String? ??
+        '';
+    final allStickers = StickerService.allStickers;
+    final stickerData = allStickers
+        .where((s) => s.id == stickerId || s.emoji == stickerId)
+        .firstOrNull;
+    final hasAnimation = stickerData?.hasAnimation ?? false;
+    final lottieAsset = stickerData?.lottieAsset;
+    final bgColor = stickerData?.backgroundColor;
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(8),
+        constraints: const BoxConstraints(minWidth: 80, minHeight: 80),
         decoration: BoxDecoration(
-          color: isMe
-              ? const Color(0xFF00FF9C).withValues(alpha: 0.2)
-              : const Color(0xFF1A1A1A),
+          color:
+              bgColor?.withValues(alpha: 0.3) ??
+              (isMe
+                  ? const Color(0xFF00FF9C).withValues(alpha: 0.2)
+                  : const Color(0xFF1A1A1A)),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isMe ? const Color(0xFF00FF9C) : const Color(0xFF2A2A2A),
           ),
         ),
-        child: Text(
-          msg['sticker'] as String? ?? msg['text'] as String? ?? '🎉',
-          style: const TextStyle(fontSize: 48),
-        ),
+        child: hasAnimation && lottieAsset != null
+            ? Lottie.asset(
+                lottieAsset,
+                width: 80,
+                height: 80,
+                fit: BoxFit.contain,
+                repeat: true,
+              )
+            : Text(
+                stickerId.isNotEmpty ? stickerId : '🎉',
+                style: const TextStyle(fontSize: 48),
+              ),
       ),
     );
   }
@@ -671,19 +736,29 @@ class _ChatScreenState extends State<ChatScreen> {
                     StickerService.packs[_selectedStickerPack].stickers[index];
                 return GestureDetector(
                   onTap: () {
-                    _sendSticker(sticker.emoji);
+                    _sendSticker(sticker);
                     setState(() => _showStickers = false);
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
+                      color:
+                          sticker.backgroundColor?.withValues(alpha: 0.2) ??
+                          const Color(0xFF2A2A2A),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
-                      child: Text(
-                        sticker.emoji,
-                        style: const TextStyle(fontSize: 28),
-                      ),
+                      child: sticker.hasAnimation
+                          ? Lottie.asset(
+                              sticker.lottieAsset!,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.contain,
+                              repeat: false,
+                            )
+                          : Text(
+                              sticker.emoji,
+                              style: const TextStyle(fontSize: 28),
+                            ),
                     ),
                   ),
                 );

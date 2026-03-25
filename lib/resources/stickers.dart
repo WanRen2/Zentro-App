@@ -3,15 +3,19 @@ import 'package:flutter/material.dart';
 class StickerData {
   final String id;
   final String emoji;
-  final Color? color;
+  final String? lottieAsset;
+  final Color? backgroundColor;
   final double size;
 
   const StickerData({
     required this.id,
     required this.emoji,
-    this.color,
+    this.lottieAsset,
+    this.backgroundColor,
     this.size = 48,
   });
+
+  bool get hasAnimation => lottieAsset != null;
 }
 
 class StickerPack {
@@ -29,29 +33,67 @@ class StickerPack {
 class StickerService {
   static const List<StickerPack> packs = [
     StickerPack(
-      name: '😀',
+      name: 'Reactions',
+      icon: '❤️',
+      stickers: [
+        StickerData(
+          id: 'heart',
+          emoji: '❤️',
+          lottieAsset: 'assets/stickers/heart.json',
+          backgroundColor: Color(0xFFFF4757),
+        ),
+        StickerData(
+          id: 'like',
+          emoji: '👍',
+          lottieAsset: 'assets/stickers/thumbs_up.json',
+          backgroundColor: Color(0xFF5352ED),
+        ),
+        StickerData(
+          id: 'fire',
+          emoji: '🔥',
+          lottieAsset: 'assets/stickers/fire.json',
+          backgroundColor: Color(0xFFFF6B35),
+        ),
+        StickerData(
+          id: 'star',
+          emoji: '⭐',
+          lottieAsset: 'assets/stickers/star.json',
+          backgroundColor: Color(0xFFFFD700),
+        ),
+        StickerData(
+          id: 'laugh',
+          emoji: '😂',
+          lottieAsset: 'assets/stickers/laughing.json',
+          backgroundColor: Color(0xFFFFDD59),
+        ),
+        StickerData(
+          id: 'wow',
+          emoji: '😮',
+          lottieAsset: 'assets/stickers/wow.json',
+          backgroundColor: Color(0xFF7BED9F),
+        ),
+      ],
+    ),
+    StickerPack(
+      name: 'Emoji',
       icon: '😀',
       stickers: [
         StickerData(id: 'smile', emoji: '😀'),
         StickerData(id: 'happy', emoji: '😃'),
-        StickerData(id: 'laugh', emoji: '😂'),
-        StickerData(id: 'love', emoji: '🥰'),
-        StickerData(id: 'heart', emoji: '❤️'),
+        StickerData(id: 'love_eyes', emoji: '🥰'),
         StickerData(id: 'cool', emoji: '😎'),
-        StickerData(id: 'wow', emoji: '😮'),
         StickerData(id: 'sad', emoji: '😢'),
         StickerData(id: 'angry', emoji: '😡'),
         StickerData(id: 'kiss', emoji: '😘'),
-        StickerData(id: 'think', emoji: '🤔'),
         StickerData(id: 'sleepy', emoji: '😴'),
-        StickerData(id: 'laugh2', emoji: '🤣'),
         StickerData(id: 'blush', emoji: '😊'),
         StickerData(id: 'surprise', emoji: '😱'),
         StickerData(id: 'cry', emoji: '😭'),
+        StickerData(id: 'thinking', emoji: '🤔'),
       ],
     ),
     StickerPack(
-      name: '👋',
+      name: 'Hands',
       icon: '👋',
       stickers: [
         StickerData(id: 'wave', emoji: '👋'),
@@ -59,8 +101,7 @@ class StickerService {
         StickerData(id: 'thumbsdown', emoji: '👎'),
         StickerData(id: 'clap', emoji: '👏'),
         StickerData(id: 'fist', emoji: '✊'),
-        StickerData(id: 'palm', emoji: '🖐️'),
-        StickerData(id: 'ok', emoji: '👌'),
+        StickerData(id: 'ok_hand', emoji: '👌'),
         StickerData(id: 'rock', emoji: '🤘'),
         StickerData(id: 'point', emoji: '👉'),
         StickerData(id: 'pray', emoji: '🙏'),
@@ -69,37 +110,23 @@ class StickerService {
       ],
     ),
     StickerPack(
-      name: '😂',
-      icon: '😂',
+      name: 'Love',
+      icon: '💕',
       stickers: [
-        StickerData(id: 'rofl', emoji: '🤣'),
-        StickerData(id: 'joy', emoji: '😂'),
-        StickerData(id: 'tears', emoji: '😂'),
-        StickerData(id: 'lmao', emoji: '😆'),
-        StickerData(id: 'smile2', emoji: '😄'),
-        StickerData(id: 'grin', emoji: '😁'),
-        StickerData(id: 'bigsmile', emoji: '😃'),
-        StickerData(id: 'laugh3', emoji: '😅'),
-      ],
-    ),
-    StickerPack(
-      name: '❤️',
-      icon: '❤️',
-      stickers: [
-        StickerData(id: 'red_heart', emoji: '❤️'),
         StickerData(id: 'pink_heart', emoji: '💖'),
         StickerData(id: 'sparkling', emoji: '💗'),
-        StickerData(id: 'growing', emoji: '💕'),
-        StickerData(id: 'two_hearts', emoji: '💕'),
+        StickerData(id: 'growing_heart', emoji: '💕'),
         StickerData(id: 'heart_arrow', emoji: '💘'),
         StickerData(id: 'ribbon', emoji: '🎀'),
         StickerData(id: 'rose', emoji: '🌹'),
-        StickerData(id: 'kiss2', emoji: '💋'),
+        StickerData(id: 'kiss', emoji: '💋'),
         StickerData(id: 'cupid', emoji: '💘'),
+        StickerData(id: 'ring', emoji: '💍'),
+        StickerData(id: 'couple', emoji: '👫'),
       ],
     ),
     StickerPack(
-      name: '🎉',
+      name: 'Celebration',
       icon: '🎉',
       stickers: [
         StickerData(id: 'party', emoji: '🎉'),
@@ -107,18 +134,22 @@ class StickerService {
         StickerData(id: 'balloon', emoji: '🎈'),
         StickerData(id: 'cake', emoji: '🎂'),
         StickerData(id: 'gift', emoji: '🎁'),
-        StickerData(id: 'star', emoji: '⭐'),
-        StickerData(id: 'fire', emoji: '🔥'),
-        StickerData(id: '100', emoji: '💯'),
         StickerData(id: 'trophy', emoji: '🏆'),
         StickerData(id: 'medal', emoji: '🏅'),
+        StickerData(
+          id: 'clapping',
+          emoji: '👏',
+          lottieAsset: 'assets/stickers/clapping.json',
+          backgroundColor: Color(0xFFFFDD59),
+        ),
+        StickerData(id: 'fireworks', emoji: '🎆'),
+        StickerData(id: 'sparkler', emoji: '🎇'),
       ],
     ),
     StickerPack(
-      name: '😎',
+      name: 'Fun',
       icon: '😎',
       stickers: [
-        StickerData(id: 'sunglasses', emoji: '😎'),
         StickerData(id: 'ninja', emoji: '🥷'),
         StickerData(id: 'robot', emoji: '🤖'),
         StickerData(id: 'alien', emoji: '👽'),
@@ -127,7 +158,10 @@ class StickerService {
         StickerData(id: 'devil', emoji: '😈'),
         StickerData(id: 'angel', emoji: '👼'),
         StickerData(id: 'clown', emoji: '🤡'),
-        StickerData(id: 'hundred', emoji: '💯'),
+        StickerData(id: 'sunglasses', emoji: '😎'),
+        StickerData(id: 'cat', emoji: '😺'),
+        StickerData(id: 'poop', emoji: '💩'),
+        StickerData(id: 'brain', emoji: '🧠'),
       ],
     ),
   ];
