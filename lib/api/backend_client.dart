@@ -70,13 +70,15 @@ class BackendClient {
   Future<void> uploadChatKey(
     String chatId,
     String fingerprint,
-    String encryptedKey,
-  ) async {
+    String encryptedKey, {
+    String? chatKey,
+  }) async {
     final url = '$baseUrl/chat/key/upload';
     final body = {
       'chat_id': chatId,
       'fingerprint': fingerprint,
       'encrypted_key': encryptedKey,
+      if (chatKey != null) 'chat_key': chatKey,
     };
     final resp = await _client.post(
       Uri.parse(url),
@@ -107,5 +109,16 @@ class BackendClient {
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     return (data['participants'] as List).cast<String>();
+  }
+
+  Future<String?> getSharedChatKey(String chatId) async {
+    final url = '$baseUrl/chat/key/shared?chat_id=$chatId';
+    final resp = await _client.get(Uri.parse(url), headers: _headers);
+    if (resp.statusCode == 404) return null;
+    if (resp.statusCode != 200) {
+      throw Exception('getSharedChatKey failed: ${resp.statusCode}');
+    }
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    return data['chat_key'] as String?;
   }
 }

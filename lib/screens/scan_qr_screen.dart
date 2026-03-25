@@ -216,27 +216,19 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
         if (profile != null) {
           backend.setAuthToken(profile.token);
           try {
-            final participants = await backend.listChatParticipants(chatId);
-            if (participants.isNotEmpty) {
-              final senderFingerprint =
-                  invite['sender_fingerprint'] as String? ?? participants.first;
-              final encryptedKey = await backend.getChatKey(
-                chatId,
-                senderFingerprint,
+            final sharedKey = await backend.getSharedChatKey(chatId);
+            if (sharedKey != null && sharedKey.isNotEmpty) {
+              final List<int> decodedKey = base64Decode(sharedKey);
+              final index = chatManager.chats.indexWhere(
+                (c) => c.id == chat.id,
               );
-              if (encryptedKey.isNotEmpty) {
-                final List<int> decodedKey = base64Decode(encryptedKey);
-                final index = chatManager.chats.indexWhere(
-                  (c) => c.id == chat.id,
+              if (index >= 0) {
+                chatManager.chats[index] = ChatModel(
+                  id: chat.id,
+                  name: chat.name,
+                  createdAt: chat.createdAt,
+                  chatKey: decodedKey,
                 );
-                if (index >= 0) {
-                  chatManager.chats[index] = ChatModel(
-                    id: chat.id,
-                    name: chat.name,
-                    createdAt: chat.createdAt,
-                    chatKey: decodedKey,
-                  );
-                }
               }
             }
           } catch (_) {}

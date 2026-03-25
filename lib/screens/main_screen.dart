@@ -70,6 +70,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           chat.id,
           _profile?.fingerprint ?? '',
           chat.chatKeyBase64,
+          chatKey: chat.chatKeyBase64,
         );
       } catch (_) {}
 
