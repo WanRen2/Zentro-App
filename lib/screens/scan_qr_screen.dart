@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../managers/chat_manager.dart';
 
 class ScanQrScreen extends StatefulWidget {
   const ScanQrScreen({super.key});
@@ -62,7 +63,6 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
     });
 
     try {
-      // Try to decode as base64
       String jsonStr;
       try {
         final decoded = base64Decode(code);
@@ -73,73 +73,138 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
 
       final invite = jsonDecode(jsonStr) as Map<String, dynamic>;
 
-      // Validate invite structure
-      if (!invite.containsKey('chat_id') ||
-          !invite.containsKey('sender_public_key')) {
-        throw Exception('Invalid invite structure');
-      }
-
+      final chatId = invite['chat_id'] as String?;
       final chatName = invite['chat_name'] as String? ?? 'Unknown Chat';
       final senderName = invite['sender_name'] as String? ?? 'Unknown';
-      final senderFingerprint = invite['sender_fingerprint'] as String? ?? '';
 
       if (!mounted) return;
 
-      // Show success dialog
-      showDialog(
+      final action = await showDialog<String>(
         context: context,
-        builder: (context) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1A1A1A),
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Color(0xFF00FF9C)),
-                SizedBox(width: 8),
-                Text(
-                  'Invite Found!',
-                  style: TextStyle(color: Color(0xFF00FF9C)),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _infoRow('Chat', chatName),
-                const SizedBox(height: 8),
-                _infoRow('From', senderName),
-                if (senderFingerprint.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _infoRow(
-                    'Fingerprint',
-                    '${senderFingerprint.substring(0, 8)}...',
-                  ),
-                ],
-                const SizedBox(height: 16),
-                const Text(
-                  'Full invite functionality coming soon!',
-                  style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Close',
-                  style: TextStyle(color: Color(0xFF00FF9C)),
-                ),
-              ),
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Color(0xFF00FF9C)),
+              SizedBox(width: 8),
+              Text('Invite Found!', style: TextStyle(color: Color(0xFF00FF9C))),
             ],
-          );
-        },
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _infoRow('Chat', chatName),
+              const SizedBox(height: 8),
+              _infoRow('From', senderName),
+              if (invite.containsKey('sender_public_key')) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00FF9C).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.person_add,
+                        color: Color(0xFF00FF9C),
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Add as friend and start chatting',
+                          style: TextStyle(
+                            color: Color(0xFFE0E0E0),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF888888)),
+              ),
+            ),
+            if (chatId != null)
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, 'join_chat'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF9C),
+                  foregroundColor: const Color(0xFF0A0A0A),
+                ),
+                child: const Text('Join Chat'),
+              ),
+            if (invite.containsKey('sender_public_key'))
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, 'add_friend'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF9C),
+                  foregroundColor: const Color(0xFF0A0A0A),
+                ),
+                child: const Text('Add Friend'),
+              ),
+          ],
+        ),
       );
+
+      if (!mounted) return;
+
+      if (action == 'add_friend') {
+        final chatManager = ChatManager();
+        final exists = await chatManager.isFriendExists(
+          invite['sender_fingerprint'] ?? '',
+        );
+        if (exists) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Already friends!'),
+              backgroundColor: Color(0xFF00FF9C),
+            ),
+          );
+        } else {
+          await chatManager.addFriend(
+            senderName,
+            invite['sender_fingerprint'] ?? '',
+            invite['sender_public_key'] ?? '',
+            code,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Friend added!'),
+                backgroundColor: Color(0xFF00FF9C),
+              ),
+            );
+            Navigator.pop(context);
+          }
+        }
+      } else if (action == 'join_chat') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat join coming soon!'),
+            backgroundColor: Color(0xFF00FF9C),
+          ),
+        );
+      } else {
+        setState(() {
+          _isScanning = true;
+          _isProcessing = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _error = 'Invalid invite code';
-      });
-      // Resume scanning
-      setState(() {
         _isScanning = true;
         _isProcessing = false;
       });
