@@ -6,15 +6,19 @@ import '../models/chat_model.dart';
 class ChatManager {
   static const _chatsKey = 'zentro_chats';
   static const _friendsKey = 'zentro_friends';
+  static const _pendingInvitesKey = 'zentro_pending_invites';
   static final ChatManager _instance = ChatManager._internal();
   factory ChatManager() => _instance;
   ChatManager._internal();
 
   final List<ChatModel> _chats = [];
   final List<Map<String, dynamic>> _friends = [];
+  final List<Map<String, dynamic>> _pendingInvites = [];
 
   List<ChatModel> get chats => List.unmodifiable(_chats);
   List<Map<String, dynamic>> get friends => List.unmodifiable(_friends);
+  List<Map<String, dynamic>> get pendingInvites =>
+      List.unmodifiable(_pendingInvites);
 
   Future<void> loadChats() async {
     final prefs = await SharedPreferences.getInstance();
@@ -52,6 +56,47 @@ class ChatManager {
     }
   }
 
+  Future<void> loadPendingInvites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = prefs.getString(_pendingInvitesKey);
+    if (jsonStr == null) {
+      _pendingInvites.clear();
+      return;
+    }
+    try {
+      final List<dynamic> jsonList = jsonDecode(jsonStr);
+      _pendingInvites.clear();
+      for (final item in jsonList) {
+        _pendingInvites.add(item as Map<String, dynamic>);
+      }
+    } catch (e) {
+      _pendingInvites.clear();
+    }
+  }
+
+  Future<void> addPendingInvite(Map<String, dynamic> invite) async {
+    final existing = _pendingInvites.any(
+      (i) => i['chat_id'] == invite['chat_id'],
+    );
+    if (!existing) {
+      _pendingInvites.insert(0, {
+        ...invite,
+        'received_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      });
+      await _savePendingInvites();
+    }
+  }
+
+  Future<void> removePendingInvite(String chatId) async {
+    _pendingInvites.removeWhere((i) => i['chat_id'] == chatId);
+    await _savePendingInvites();
+  }
+
+  Future<void> _savePendingInvites() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingInvitesKey, jsonEncode(_pendingInvites));
+  }
+
   Future<ChatModel> createChat(String name) async {
     final chatKey = _generateChatKey();
     final chat = ChatModel(
@@ -80,6 +125,27 @@ class ChatManager {
     _chats.insert(0, chat);
     await _saveChats();
     return chat;
+  }
+
+  Future<ChatModel> joinChat(
+    String chatId,
+    String chatName,
+    String senderName,
+  ) async {
+    final chatKey = _generateChatKey();
+    final chat = ChatModel(
+      id: chatId,
+      name: chatName,
+      createdAt: DateTime.now(),
+      chatKey: chatKey,
+    );
+    _chats.insert(0, chat);
+    await _saveChats();
+    return chat;
+  }
+
+  bool isChatExists(String chatId) {
+    return _chats.any((c) => c.id == chatId);
   }
 
   Future<void> addFriend(

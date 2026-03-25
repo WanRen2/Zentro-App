@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'theme/app_theme.dart';
+import 'theme/theme_manager.dart';
 import 'screens/profile_screen.dart';
 import 'screens/main_screen.dart';
 import 'managers/profile_manager.dart';
@@ -14,20 +14,28 @@ class ZentroApp extends StatefulWidget {
 class _ZentroAppState extends State<ZentroApp> {
   bool _isLoading = true;
   bool _hasProfile = false;
+  final _themeManager = ThemeManager();
 
   @override
   void initState() {
     super.initState();
-    _checkProfile();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _themeManager.loadTheme();
+    await _checkProfile();
   }
 
   Future<void> _checkProfile() async {
     final pm = ProfileManager();
     final profile = await pm.loadProfile();
-    setState(() {
-      _hasProfile = profile != null;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _hasProfile = profile != null;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -35,12 +43,12 @@ class _ZentroAppState extends State<ZentroApp> {
     return MaterialApp(
       title: 'Zentro',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: _themeManager.getThemeData(),
       home: _isLoading
-          ? const Scaffold(
-              backgroundColor: Color(0xFF0A0A0A),
+          ? Scaffold(
+              backgroundColor: _themeManager.bg,
               body: Center(
-                child: CircularProgressIndicator(color: Color(0xFF00FF9C)),
+                child: CircularProgressIndicator(color: _themeManager.accent),
               ),
             )
           : _hasProfile

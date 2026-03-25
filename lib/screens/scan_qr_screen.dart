@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../managers/chat_manager.dart';
+import '../managers/profile_manager.dart';
+import '../models/chat_model.dart';
+import '../api/backend_client.dart';
+import 'chat_screen.dart';
 
 class ScanQrScreen extends StatefulWidget {
   const ScanQrScreen({super.key});
@@ -190,10 +194,66 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
           }
         }
       } else if (action == 'join_chat') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat join coming soon!'),
-            backgroundColor: Color(0xFF00FF9C),
+        final chatManager = ChatManager();
+        final chatId = invite['chat_id'] as String;
+
+        if (chatManager.isChatExists(chatId)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You are already in this chat!'),
+              backgroundColor: Color(0xFF00FF9C),
+            ),
+          );
+          Navigator.pop(context);
+          return;
+        }
+
+        final chat = await chatManager.joinChat(chatId, chatName, senderName);
+
+        final backend = BackendClient();
+        final pm = ProfileManager();
+        final profile = await pm.loadProfile();
+        if (profile != null) {
+          backend.setAuthToken(profile.token);
+          try {
+            final participants = await backend.listChatParticipants(chatId);
+            if (participants.isNotEmpty) {
+              final senderFingerprint =
+                  invite['sender_fingerprint'] as String? ?? participants.first;
+              final encryptedKey = await backend.getChatKey(
+                chatId,
+                senderFingerprint,
+              );
+              if (encryptedKey.isNotEmpty) {
+                final List<int> decodedKey = base64Decode(encryptedKey);
+                final index = chatManager.chats.indexWhere(
+                  (c) => c.id == chat.id,
+                );
+                if (index >= 0) {
+                  chatManager.chats[index] = ChatModel(
+                    id: chat.id,
+                    name: chat.name,
+                    createdAt: chat.createdAt,
+                    chatKey: decodedKey,
+                  );
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (!mounted) return;
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              chatId: chat.id,
+              chatKey: chatManager.chats
+                  .firstWhere((c) => c.id == chat.id)
+                  .chatKey,
+              chatName: chat.name,
+            ),
           ),
         );
       } else {

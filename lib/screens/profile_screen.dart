@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../managers/profile_manager.dart';
 import '../models/profile_model.dart';
 import 'main_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final ProfileModel? profile;
@@ -252,6 +253,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: Color(0xFF888888)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+            tooltip: 'Settings',
+          ),
           IconButton(
             icon: Container(
               padding: const EdgeInsets.all(8),
