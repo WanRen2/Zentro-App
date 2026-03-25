@@ -131,8 +131,9 @@ class ChatManager {
     String chatId,
     String chatName,
     String senderName,
+    String chatKeyBase64,
   ) async {
-    final chatKey = _generateChatKey();
+    final chatKey = base64Decode(chatKeyBase64);
     final chat = ChatModel(
       id: chatId,
       name: chatName,

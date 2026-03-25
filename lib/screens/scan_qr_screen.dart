@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../managers/chat_manager.dart';
-import '../managers/profile_manager.dart';
-import '../models/chat_model.dart';
-import '../api/backend_client.dart';
 import 'chat_screen.dart';
 
 class ScanQrScreen extends StatefulWidget {
@@ -196,6 +193,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
       } else if (action == 'join_chat') {
         final chatManager = ChatManager();
         final chatId = invite['chat_id'] as String;
+        final chatKeyFromInvite = invite['chat_key'] as String?;
 
         if (chatManager.isChatExists(chatId)) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -208,31 +206,23 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
           return;
         }
 
-        final chat = await chatManager.joinChat(chatId, chatName, senderName);
-
-        final backend = BackendClient();
-        final pm = ProfileManager();
-        final profile = await pm.loadProfile();
-        if (profile != null) {
-          backend.setAuthToken(profile.token);
-          try {
-            final sharedKey = await backend.getSharedChatKey(chatId);
-            if (sharedKey != null && sharedKey.isNotEmpty) {
-              final List<int> decodedKey = base64Decode(sharedKey);
-              final index = chatManager.chats.indexWhere(
-                (c) => c.id == chat.id,
-              );
-              if (index >= 0) {
-                chatManager.chats[index] = ChatModel(
-                  id: chat.id,
-                  name: chat.name,
-                  createdAt: chat.createdAt,
-                  chatKey: decodedKey,
-                );
-              }
-            }
-          } catch (_) {}
+        if (chatKeyFromInvite == null || chatKeyFromInvite.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid invite: missing chat key'),
+              backgroundColor: Color(0xFFFF4444),
+            ),
+          );
+          Navigator.pop(context);
+          return;
         }
+
+        final chat = await chatManager.joinChat(
+          chatId,
+          chatName,
+          senderName,
+          chatKeyFromInvite,
+        );
 
         if (!mounted) return;
         Navigator.pop(context);
@@ -241,9 +231,7 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
           MaterialPageRoute(
             builder: (_) => ChatScreen(
               chatId: chat.id,
-              chatKey: chatManager.chats
-                  .firstWhere((c) => c.id == chat.id)
-                  .chatKey,
+              chatKey: chat.chatKey,
               chatName: chat.name,
             ),
           ),

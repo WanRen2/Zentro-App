@@ -31,6 +31,7 @@ class _InviteScreenState extends State<InviteScreen> {
       'chat_id': widget.chat.id,
       'chat_name': widget.chat.name,
       'sender_name': widget.profile.name,
+      'chat_key': widget.chat.chatKeyBase64,
       'ts': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'expires_at': (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600,
     };

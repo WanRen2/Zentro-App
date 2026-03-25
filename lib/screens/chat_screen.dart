@@ -75,10 +75,12 @@ class _ChatScreenState extends State<ChatScreen> {
           try {
             final m = await _backend.getMessage(widget.chatId, id);
             String? decryptedText;
+            bool decryptFailed = false;
 
             if (m.containsKey('ciphertext') &&
                 m.containsKey('nonce') &&
-                m.containsKey('mac')) {
+                m.containsKey('mac') &&
+                (m['mac'] as String?)?.isNotEmpty == true) {
               try {
                 final dec = await ChatCrypto.decryptWithChatKey(
                   widget.chatKey,
@@ -88,17 +90,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
                 decryptedText = utf8.decode(dec);
               } catch (e) {
-                // Only show "[Encrypted]" for messages from others
-                final isFromMe = m['from'] == _myFingerprint;
-                decryptedText = isFromMe ? null : '[Encrypted]';
+                decryptFailed = true;
               }
+            } else {
+              decryptFailed = true;
             }
 
             newMessages.add({
               'id': id,
               ...m,
-              'text': decryptedText,
-              'decryptFailed': decryptedText == null,
+              'text': decryptFailed ? '[Encrypted]' : decryptedText,
+              'decryptFailed': decryptFailed,
             });
           } catch (e) {
             // Message might not exist yet
@@ -254,7 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final isMe = msg['from'] == _myFingerprint;
         final decryptFailed = msg['decryptFailed'] == true;
 
-        // Hide messages from self that failed to decrypt (something is wrong)
+        // Hide own messages that failed to decrypt
         if (isMe && decryptFailed) {
           return const SizedBox.shrink();
         }
