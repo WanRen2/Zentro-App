@@ -31,8 +31,6 @@ class _InviteScreenState extends State<InviteScreen> {
       'chat_id': widget.chat.id,
       'chat_name': widget.chat.name,
       'sender_name': widget.profile.name,
-      'sender_public_key': widget.profile.publicKeyBase64,
-      'sender_fingerprint': widget.profile.fingerprint,
       'ts': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'expires_at': (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600,
     };
@@ -50,14 +48,10 @@ class _InviteScreenState extends State<InviteScreen> {
     );
   }
 
-  void _shareInvite() {
-    Clipboard.setData(ClipboardData(text: _inviteData));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Invite code copied! Share it with others.'),
-        backgroundColor: Color(0xFF00FF9C),
-        duration: Duration(seconds: 3),
-      ),
+  Future<void> _shareInvite() async {
+    await Share.share(
+      'Join my encrypted chat "${widget.chat.name}" on Zentro!\n\nInvite code:\n$_inviteData',
+      subject: 'Zentro Chat Invite',
     );
   }
 
