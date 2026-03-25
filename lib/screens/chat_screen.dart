@@ -7,6 +7,7 @@ import '../api/backend_client.dart';
 import '../managers/profile_manager.dart';
 import '../crypto/chat_crypto.dart';
 import '../config.dart';
+import 'scan_qr_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -142,6 +143,7 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0A0A0A),
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFFE0E0E0)),
           onPressed: () => Navigator.pop(context),
@@ -172,6 +174,17 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code, color: Color(0xFF00FF9C)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScanQrScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

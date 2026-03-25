@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../managers/profile_manager.dart';
 import '../managers/chat_manager.dart';
@@ -16,25 +17,50 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final ChatManager _chatManager = ChatManager();
   final BackendClient _backend = BackendClient();
   ProfileModel? _profile;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadData();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _loadData();
+    });
   }
 
   Future<void> _loadData() async {
     final pm = ProfileManager();
     final profile = await pm.loadProfile();
     await _chatManager.loadChats();
-    setState(() {
-      _profile = profile;
-    });
+    if (mounted) {
+      setState(() {
+        _profile = profile;
+      });
+    }
   }
 
   Future<void> _createChat() async {
@@ -61,7 +87,7 @@ class _MainScreenState extends State<MainScreen> {
         MaterialPageRoute(
           builder: (_) => InviteScreen(chat: chat, profile: _profile!),
         ),
-      ).then((_) => setState(() {}));
+      ).then((_) => _loadData());
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,40 +101,81 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String?> _showCreateChatDialog() async {
     final controller = TextEditingController();
-    return showDialog<String>(
+    return showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text(
-          'New Chat',
-          style: TextStyle(color: Color(0xFFE0E0E0)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(color: Color(0xFFE0E0E0)),
-          decoration: const InputDecoration(
-            hintText: 'Chat name',
-            hintStyle: TextStyle(color: Color(0xFF888888)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[600],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'New Chat',
+                style: TextStyle(
+                  color: Color(0xFFE0E0E0),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: const TextStyle(color: Color(0xFFE0E0E0)),
+                decoration: InputDecoration(
+                  hintText: 'Chat name',
+                  hintStyle: const TextStyle(color: Color(0xFF888888)),
+                  filled: true,
+                  fillColor: const Color(0xFF0A0A0A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, controller.text),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF9C),
+                    foregroundColor: const Color(0xFF0A0A0A),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Create',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF888888)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF9C),
-              foregroundColor: const Color(0xFF0A0A0A),
-            ),
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
   }
@@ -122,37 +189,14 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           _ChatsTab(
             chatManager: _chatManager,
-            backend: _backend,
             profile: _profile,
             onRefresh: _loadData,
             onCreateChat: _createChat,
           ),
-          const _FriendsTab(),
+          _FriendsTab(profile: _profile),
           ProfileScreen(profile: _profile, onRefresh: _loadData),
         ],
       ),
-      floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton(
-              onPressed: _createChat,
-              backgroundColor: const Color(0xFF00FF9C),
-              child: const Icon(Icons.add, color: Color(0xFF0A0A0A)),
-            )
-          : _currentIndex == 1
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ScanQrScreen()),
-                );
-              },
-              backgroundColor: const Color(0xFF00FF9C),
-              child: const Icon(
-                Icons.qr_code_scanner,
-                color: Color(0xFF0A0A0A),
-              ),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -160,85 +204,66 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
+        color: const Color(0xFF111111),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00FF9C).withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-        child: BottomAppBar(
-          color: Colors.transparent,
-          elevation: 0,
-          shape: const CircularNotchedRectangle(),
-          notchMargin: 8,
-          child: SizedBox(
-            height: 70,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  0,
-                  Icons.chat_bubble_outline,
-                  Icons.chat_bubble,
-                  'Chats',
-                ),
-                const SizedBox(width: 48),
-                _buildNavItem(1, Icons.people_outline, Icons.people, 'Friends'),
-                const SizedBox(width: 48),
-                _buildNavItem(2, Icons.person_outline, Icons.person, 'Profile'),
-              ],
-            ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.chat_bubble_outline, 'Chats'),
+              _buildNavItem(1, Icons.people_outline, 'Friends'),
+              _buildNavItem(2, Icons.person_outline, 'Profile'),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(
-    int index,
-    IconData icon,
-    IconData activeIcon,
-    String label,
-  ) {
+  Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 70,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF00FF9C).withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isSelected ? activeIcon : icon,
+              icon,
               color: isSelected
                   ? const Color(0xFF00FF9C)
                   : const Color(0xFF888888),
-              size: 26,
+              size: 24,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF00FF9C)
-                    : const Color(0xFF888888),
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF00FF9C),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -248,14 +273,12 @@ class _MainScreenState extends State<MainScreen> {
 
 class _ChatsTab extends StatelessWidget {
   final ChatManager chatManager;
-  final BackendClient backend;
   final ProfileModel? profile;
   final VoidCallback onRefresh;
   final VoidCallback onCreateChat;
 
   const _ChatsTab({
     required this.chatManager,
-    required this.backend,
     required this.profile,
     required this.onRefresh,
     required this.onCreateChat,
@@ -263,89 +286,69 @@ class _ChatsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ZENTRO',
-                      style: TextStyle(
-                        color: Color(0xFF00FF9C),
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                    if (profile?.name != null)
-                      Text(
-                        profile!.name,
-                        style: const TextStyle(
-                          color: Color(0xFF888888),
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Color(0xFF00FF9C)),
-                  onPressed: onRefresh,
-                ),
-              ],
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0A0A),
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Chats',
+              style: TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
             ),
+            Text(
+              '${chatManager.chats.length} conversations',
+              style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: Color(0xFF00FF9C),
+              size: 28,
+            ),
+            onPressed: onCreateChat,
           ),
-          Expanded(
-            child: chatManager.chats.isEmpty
-                ? _buildEmptyState(context)
-                : _buildChatList(context),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
+      body: chatManager.chats.isEmpty
+          ? _buildEmptyState()
+          : _buildChatList(context),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.chat_bubble_outline,
             size: 80,
-            color: Color(0xFF2A2A2A),
+            color: const Color(0xFF888888).withValues(alpha: 0.5),
           ),
           const SizedBox(height: 24),
           const Text(
-            'No chats yet',
+            'No conversations yet',
             style: TextStyle(
               color: Color(0xFFE0E0E0),
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Create a new chat to get started',
+            'Start a new chat to begin',
             style: TextStyle(color: Color(0xFF888888), fontSize: 14),
-          ),
-          const SizedBox(height: 32),
-          OutlinedButton.icon(
-            onPressed: onCreateChat,
-            icon: const Icon(Icons.add, color: Color(0xFF00FF9C)),
-            label: const Text(
-              'Create Chat',
-              style: TextStyle(color: Color(0xFF00FF9C)),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF00FF9C)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
           ),
         ],
       ),
@@ -354,7 +357,7 @@ class _ChatsTab extends StatelessWidget {
 
   Widget _buildChatList(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.only(top: 8, bottom: 100),
       itemCount: chatManager.chats.length,
       itemBuilder: (context, index) {
         final chat = chatManager.chats[index];
@@ -364,59 +367,9 @@ class _ChatsTab extends StatelessWidget {
   }
 
   Widget _buildChatTile(BuildContext context, ChatModel chat) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF00FF9C).withValues(alpha: 0.1),
-          child: Text(
-            chat.name.isNotEmpty ? chat.name[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Color(0xFF00FF9C),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          chat.name,
-          style: const TextStyle(
-            color: Color(0xFFE0E0E0),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Text(
-          'Created ${_formatDate(chat.createdAt)}',
-          style: const TextStyle(color: Color(0xFF888888), fontSize: 12),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(
-                Icons.qr_code,
-                color: Color(0xFF00FF9C),
-                size: 20,
-              ),
-              onPressed: () {
-                if (profile != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          InviteScreen(chat: chat, profile: profile!),
-                    ),
-                  );
-                }
-              },
-            ),
-            const Icon(Icons.chevron_right, color: Color(0xFF888888)),
-          ],
-        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: () {
           Navigator.push(
             context,
@@ -427,8 +380,81 @@ class _ChatsTab extends StatelessWidget {
                 chatName: chat.name,
               ),
             ),
-          );
+          ).then((_) => onRefresh());
         },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF9C).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Center(
+                  child: Text(
+                    chat.name.isNotEmpty ? chat.name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Color(0xFF00FF9C),
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          chat.name,
+                          style: const TextStyle(
+                            color: Color(0xFFE0E0E0),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Icon(
+                          Icons.lock,
+                          size: 14,
+                          color: const Color(0xFF00FF9C).withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(chat.createdAt),
+                      style: const TextStyle(
+                        color: Color(0xFF888888),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.qr_code, color: Color(0xFF888888)),
+                onPressed: () {
+                  if (profile != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            InviteScreen(chat: chat, profile: profile!),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -444,94 +470,96 @@ class _ChatsTab extends StatelessWidget {
 }
 
 class _FriendsTab extends StatelessWidget {
-  const _FriendsTab();
+  final ProfileModel? profile;
+
+  const _FriendsTab({this.profile});
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Text(
-                  'FRIENDS',
-                  style: TextStyle(
-                    color: Color(0xFF00FF9C),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 80),
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00FF9C).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.people_outline,
-                      size: 64,
-                      color: Color(0xFF00FF9C),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Add Friends',
-                    style: TextStyle(
-                      color: Color(0xFFE0E0E0),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 48),
-                    child: Text(
-                      'Scan a QR code to add friends and start encrypted conversations',
-                      style: TextStyle(color: Color(0xFF888888), fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ScanQrScreen()),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.qr_code_scanner,
-                      color: Color(0xFF00FF9C),
-                    ),
-                    label: const Text(
-                      'Scan QR Code',
-                      style: TextStyle(color: Color(0xFF00FF9C)),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF00FF9C)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0A0A),
+        elevation: 0,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Friends',
+              style: TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            Text(
+              'Add and manage your contacts',
+              style: TextStyle(color: Color(0xFF888888), fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF9C).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.people_outline,
+                  size: 64,
+                  color: Color(0xFF00FF9C),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'Add Friends',
+                style: TextStyle(
+                  color: Color(0xFFE0E0E0),
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Scan a QR code to add friends and start encrypted conversations',
+                style: TextStyle(color: Color(0xFF888888), fontSize: 15),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ScanQrScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.qr_code_scanner, size: 22),
+                  label: const Text(
+                    'Scan QR Code',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF9C),
+                    foregroundColor: const Color(0xFF0A0A0A),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

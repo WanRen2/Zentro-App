@@ -67,6 +67,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(
           content: Text('Fingerprint copied!'),
           backgroundColor: Color(0xFF00FF9C),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showMyInvite() {
+    if (widget.profile != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _MyInviteScreen(profile: widget.profile!),
         ),
       );
     }
@@ -219,148 +231,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildProfileView() {
     final profile = widget.profile!;
-    return SafeArea(
-      child: SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0A0A),
+        elevation: 0,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Profile',
+              style: TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00FF9C).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.qr_code,
+                color: Color(0xFF00FF9C),
+                size: 22,
+              ),
+            ),
+            onPressed: _showMyInvite,
+            tooltip: 'My Invite QR',
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    'PROFILE',
-                    style: TextStyle(
-                      color: Color(0xFF00FF9C),
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF00FF9C), width: 3),
               ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF00FF9C),
-                        width: 3,
-                      ),
-                    ),
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: const Color(
-                        0xFF00FF9C,
-                      ).withValues(alpha: 0.1),
-                      child: Text(
-                        profile.name.isNotEmpty
-                            ? profile.name[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Color(0xFF00FF9C),
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: const Color(0xFF00FF9C).withValues(alpha: 0.1),
+                child: Text(
+                  profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Color(0xFF00FF9C),
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    profile.name,
-                    style: const TextStyle(
-                      color: Color(0xFFE0E0E0),
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Zentro User',
-                    style: TextStyle(color: Color(0xFF888888), fontSize: 14),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Fingerprint',
-                    style: TextStyle(color: Color(0xFF888888), fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${profile.fingerprint.substring(0, 16)}...',
-                          style: const TextStyle(
-                            color: Color(0xFF00FF9C),
-                            fontSize: 12,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.copy,
-                          color: Color(0xFF00FF9C),
-                          size: 20,
-                        ),
-                        onPressed: _copyFingerprint,
-                        tooltip: 'Copy full fingerprint',
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
+            Text(
+              profile.name,
+              style: const TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Public Key',
-                    style: TextStyle(color: Color(0xFF888888), fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.verified_user,
+                  size: 16,
+                  color: Color(0xFF00FF9C),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Zentro User',
+                  style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            _buildInfoCard(
+              icon: Icons.fingerprint,
+              title: 'Fingerprint',
+              subtitle: profile.fingerprint,
+              onCopy: _copyFingerprint,
+            ),
+            const SizedBox(height: 16),
+            _buildInfoCard(
+              icon: Icons.key,
+              title: 'Public Key',
+              subtitle: profile.publicKeyBase64,
+              onCopy: () {
+                Clipboard.setData(ClipboardData(text: profile.publicKeyBase64));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Public key copied!'),
+                    backgroundColor: Color(0xFF00FF9C),
+                    duration: Duration(seconds: 2),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${profile.publicKeyBase64.substring(0, 24)}...',
-                    style: const TextStyle(
-                      color: Color(0xFFE0E0E0),
-                      fontSize: 10,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -383,10 +362,167 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFFFF4444)),
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onCopy,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00FF9C).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: const Color(0xFF00FF9C), size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle.length > 32
+                      ? '${subtitle.substring(0, 32)}...'
+                      : subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFFE0E0E0),
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy, color: Color(0xFF888888), size: 20),
+            onPressed: onCopy,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MyInviteScreen extends StatelessWidget {
+  final ProfileModel profile;
+
+  const _MyInviteScreen({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0A0A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFFE0E0E0)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'My Invite',
+          style: TextStyle(
+            color: Color(0xFFE0E0E0),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person_add, size: 64, color: Color(0xFF00FF9C)),
+            const SizedBox(height: 24),
+            const Text(
+              'Share Your Profile',
+              style: TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Let friends add you by scanning this QR',
+              style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+            ),
+            const SizedBox(height: 40),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: const Color(
+                      0xFF00FF9C,
+                    ).withValues(alpha: 0.1),
+                    child: Text(
+                      profile.name.isNotEmpty
+                          ? profile.name[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: Color(0xFF00FF9C),
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    profile.name,
+                    style: const TextStyle(
+                      color: Color(0xFF0A0A0A),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'FP: ${profile.fingerprint.substring(0, 8)}...',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
