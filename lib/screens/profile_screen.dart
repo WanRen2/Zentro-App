@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../managers/profile_manager.dart';
 import '../models/profile_model.dart';
 import 'main_screen.dart';
@@ -440,6 +442,8 @@ class _MyInviteScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inviteData = base64Encode(utf8.encode(profile.token));
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
@@ -458,65 +462,118 @@ class _MyInviteScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Center(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.person_add, size: 64, color: Color(0xFF00FF9C)),
-            const SizedBox(height: 24),
-            const Text(
-              'Share Your Profile',
-              style: TextStyle(
-                color: Color(0xFFE0E0E0),
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Let friends add you by scanning this QR',
-              style: TextStyle(color: Color(0xFF888888), fontSize: 14),
-            ),
-            const SizedBox(height: 40),
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: const Color(
-                      0xFF00FF9C,
-                    ).withValues(alpha: 0.1),
-                    child: Text(
-                      profile.name.isNotEmpty
-                          ? profile.name[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Color(0xFF00FF9C),
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  const Icon(
+                    Icons.person_add,
+                    size: 48,
+                    color: Color(0xFF00FF9C),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     profile.name,
                     style: const TextStyle(
-                      color: Color(0xFF0A0A0A),
-                      fontSize: 18,
+                      color: Color(0xFFE0E0E0),
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'FP: ${profile.fingerprint.substring(0, 8)}...',
-                    style: TextStyle(
-                      color: Colors.grey[600],
+                    style: const TextStyle(
+                      color: Color(0xFF888888),
                       fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Share Your Profile',
+              style: TextStyle(
+                color: Color(0xFFE0E0E0),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Let friends scan this QR code to add you',
+              style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: QrImageView(
+                data: inviteData,
+                version: QrVersions.auto,
+                size: 200,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Invite Code',
+                        style: TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 12,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.copy,
+                          color: Color(0xFF00FF9C),
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: inviteData));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Invite code copied!'),
+                              backgroundColor: Color(0xFF00FF9C),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  SelectableText(
+                    inviteData,
+                    style: const TextStyle(
+                      color: Color(0xFF00FF9C),
+                      fontSize: 10,
                       fontFamily: 'monospace',
                     ),
                   ),

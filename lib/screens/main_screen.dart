@@ -276,10 +276,9 @@ class _ChatsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -321,27 +320,6 @@ class _ChatsTab extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Text(
-                  '${chatManager.chats.length}',
-                  style: const TextStyle(
-                    color: Color(0xFFE0E0E0),
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'chats',
-                  style: TextStyle(color: Color(0xFF888888), fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
           Expanded(
             child: chatManager.chats.isEmpty
                 ? _buildEmptyState(context)
@@ -392,7 +370,7 @@ class _ChatsTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
       itemCount: chatManager.chats.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 4),
+      separatorBuilder: (context, index) => const SizedBox(height: 4),
       itemBuilder: (context, index) {
         final chat = chatManager.chats[index];
         return _buildChatTile(context, chat);
@@ -401,107 +379,104 @@ class _ChatsTab extends StatelessWidget {
   }
 
   Widget _buildChatTile(BuildContext context, ChatModel chat) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatScreen(
-                chatId: chat.id,
-                chatKey: chat.chatKey,
-                chatName: chat.name,
-              ),
-            ),
-          ).then((_) => onRefresh());
-        },
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF9C).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  chatId: chat.id,
+                  chatKey: chat.chatKey,
+                  chatName: chat.name,
                 ),
-                child: Center(
+              ),
+            ).then((_) => onRefresh());
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(
+                    0xFF00FF9C,
+                  ).withValues(alpha: 0.1),
                   child: Text(
                     chat.name.isNotEmpty ? chat.name[0].toUpperCase() : '?',
                     style: const TextStyle(
                       color: Color(0xFF00FF9C),
-                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            chat.name,
-                            style: const TextStyle(
-                              color: Color(0xFFE0E0E0),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              chat.name,
+                              style: const TextStyle(
+                                color: Color(0xFFE0E0E0),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.lock,
-                          size: 12,
-                          color: Color(0xFF00FF9C),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatDate(chat.createdAt),
-                      style: const TextStyle(
-                        color: Color(0xFF888888),
-                        fontSize: 13,
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.lock,
+                            size: 12,
+                            color: Color(0xFF00FF9C),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(
-                  Icons.qr_code,
-                  color: Color(0xFF888888),
-                  size: 20,
-                ),
-                onPressed: () {
-                  if (profile != null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            InviteScreen(chat: chat, profile: profile!),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDate(chat.createdAt),
+                        style: const TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 13,
+                        ),
                       ),
-                    );
-                  }
-                },
-              ),
-            ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(
+                    Icons.qr_code,
+                    color: Color(0xFF888888),
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    if (profile != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              InviteScreen(chat: chat, profile: profile!),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

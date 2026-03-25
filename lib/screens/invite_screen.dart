@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/chat_model.dart';
 import '../models/profile_model.dart';
 
@@ -50,13 +51,9 @@ class _InviteScreenState extends State<InviteScreen> {
   }
 
   void _shareInvite() {
-    Clipboard.setData(ClipboardData(text: _inviteData));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Invite code copied! Share it with others.'),
-        backgroundColor: Color(0xFF00FF9C),
-        duration: Duration(seconds: 3),
-      ),
+    Share.share(
+      'Join my encrypted chat "${widget.chat.name}" on Zentro!\n\nInvite code:\n$_inviteData',
+      subject: 'Zentro Chat Invite',
     );
   }
 
